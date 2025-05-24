@@ -9,28 +9,6 @@ import {
 } from "lucide-react";
 import { useGetVideoList } from "./../TanstackQueries/GetAllVideosQuery";
 
-// Mock data and functions to replace external dependencies
-// const mockVideoData = [
-//   {
-//     _id: "1",
-//     title: "Introduction to React Hooks",
-//     videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-//     duration: 596
-//   },
-//   {
-//     _id: "2",
-//     title: "Advanced State Management",
-//     videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-//     duration: 653
-//   },
-//   {
-//     _id: "3",
-//     title: "Building Custom Components",
-//     videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-//     duration: 15
-//   }
-// ];
-
 function secondsToIntervals(secondsSet) {
   if (!secondsSet || secondsSet.size === 0) return [];
 
@@ -74,7 +52,6 @@ const WatchedVideo = () => {
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !selectedVideo?._id) return;
@@ -90,44 +67,61 @@ const WatchedVideo = () => {
       }
     };
 
-    const handleTimeUpdate = () => {
-      const currentSecond = Math.floor(video.currentTime);
-      setCurrentTime(video.currentTime);
-
-      setVideoProgressMap((prev) => {
-        const videoId = selectedVideo._id;
-        const videoData = prev[videoId] || {
-          watched: new Set(),
-          currentTime: 0,
-        };
-
-        const newWatched = new Set(videoData.watched);
-        newWatched.add(currentSecond);
-
-        return {
-          ...prev,
-          [videoId]: {
-            watched: newWatched,
-            currentTime: video.currentTime,
-          },
-        };
-      });
-    };
-
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
-    video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("play", () => setIsPlaying(true));
     video.addEventListener("pause", () => setIsPlaying(false));
 
     return () => {
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("play", () => setIsPlaying(true));
       video.removeEventListener("pause", () => setIsPlaying(false));
     };
   }, [selectedVideo]);
 
+  const progressRef = useRef(videoProgressMap);
+  useEffect(() => {
+    progressRef.current = videoProgressMap;
+  }, [videoProgressMap]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !selectedVideo?._id) return;
+
+    let animationId;
+
+    const trackFrame = () => {
+      const savedProgress = progressRef.current[selectedVideo._id];
+      console.log(savedProgress);
+      if (!video.paused && !video.ended) {
+        const currentSecond = Math.floor(video.currentTime);
+        setCurrentTime(video.currentTime);
+
+        setVideoProgressMap((prev) => {
+          const videoId = selectedVideo._id;
+          const videoData = prev[videoId] || {
+            watched: new Set(),
+            currentTime: 0,
+          };
+
+          const newWatched = new Set(videoData.watched);
+          newWatched.add(currentSecond);
+
+          return {
+            ...prev,
+            [videoId]: {
+              watched: newWatched,
+              currentTime: video.currentTime,
+            },
+          };
+        });
+      }
+      animationId = requestAnimationFrame(trackFrame);
+    };
+
+    animationId = requestAnimationFrame(trackFrame);
+
+    return () => cancelAnimationFrame(animationId);
+  }, [selectedVideo]);
 
   const resetProgress = () => {
     setVideoProgressMap((prev) => ({
@@ -179,8 +173,9 @@ const WatchedVideo = () => {
 
   const watchedSeconds =
     videoProgressMap[selectedVideo?._id]?.watched || new Set();
+
   const progressPercent =
-    duration > 0 ? (watchedSeconds.size / duration) * 100 : 0;
+    duration > 0 ? ((watchedSeconds.size - 1) / duration) * 100 : 0;
   const intervals = secondsToIntervals(watchedSeconds);
 
   if (!selectedVideo?._id) {
@@ -331,7 +326,7 @@ const WatchedVideo = () => {
                     <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
                       <span>{formatTime(currentTime)}</span>
                       <span>
-                        {watchedSeconds.size} / {duration} seconds watched
+                        {watchedSeconds.size - 1} / {duration} seconds watched
                       </span>
                       <span>{formatTime(duration)}</span>
                     </div>
