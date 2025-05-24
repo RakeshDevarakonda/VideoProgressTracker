@@ -1,8 +1,38 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Clock,
+  CheckCircle,
+  Video,
+} from "lucide-react";
+import { useGetVideoList } from "./../TanstackQueries/GetAllVideosQuery";
+
+// Mock data and functions to replace external dependencies
+// const mockVideoData = [
+//   {
+//     _id: "1",
+//     title: "Introduction to React Hooks",
+//     videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+//     duration: 596
+//   },
+//   {
+//     _id: "2",
+//     title: "Advanced State Management",
+//     videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+//     duration: 653
+//   },
+//   {
+//     _id: "3",
+//     title: "Building Custom Components",
+//     videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+//     duration: 15
+//   }
+// ];
 
 function secondsToIntervals(secondsSet) {
-  if (!secondsSet) return;
-  if (secondsSet.size === 0) return [];
+  if (!secondsSet || secondsSet.size === 0) return [];
 
   const sorted = Array.from(secondsSet).sort((a, b) => a - b);
   const intervals = [];
@@ -24,165 +54,94 @@ function secondsToIntervals(secondsSet) {
 }
 
 const WatchedVideo = () => {
-  const videoRef = useRef(null);
-  const getStorageKeySeconds = (id) => `watchedSeconds_${id}`;
-  const getStorageKeyTime = (id) => `videoCurrentTime_${id}`;
-  const defaultVideos = [
-    {
-      id: "1",
-      url: "/Thor_Arrives_In_Wakanda_Scene_-_Avengers_Infinity_War__2018__Movie_CLIP_4K_ULTRA_HD(2160p).webm",
-      name: "Wakanda Thor Video",
-    },
-  ];
   const [videoList, setVideoList] = useState(null);
-  const [selectedVideo, setselectedVideo] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const videoRef = useRef(null);
 
-  const [customUrl, setCustomUrl] = useState("");
+  const { data, isLoading, error, isSuccess } = useGetVideoList();
 
-  const [watchedSeconds, setWatchedSeconds] = useState(null);
+  useEffect(() => {
+    if (data && isSuccess) {
+      const NewData = data.videos;
+      setVideoList(NewData);
+      setSelectedVideo(NewData[0]);
+      console.log(NewData);
+    }
+  }, [data, isSuccess]);
 
-  const [currentTime, setCurrentTime] = useState(null);
-
+  const [videoProgressMap, setVideoProgressMap] = useState({});
+  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const addCustomVideo = () => {
-    if (!customUrl.trim()) return;
-
-    const newId = `custom-${Date.now()}`;
-    const fileName = customUrl.split("/").pop() || customUrl;
-    const displayName =
-      fileName.length > 30 ? fileName.substring(0, 30) + "..." : fileName;
-
-    const newVideo = {
-      id: newId,
-      name: displayName || "hello",
-      url: customUrl.trim(),
-    };
-
-    setVideoList((prev) => [...prev, newVideo]);
-    setCustomUrl("");
-
-    const updatedList = [...videoList, newVideo];
-
-    localStorage.setItem("videoList", JSON.stringify(updatedList));
-  };
-
-  useEffect(() => {
-    const storedVideoList = localStorage.getItem("videoList");
-    const storedSelectedVideo = localStorage.getItem("selectedVideo");
-
-    const parsedVideoList = storedVideoList
-      ? JSON.parse(storedVideoList)
-      : defaultVideos;
-
-    const parsedSelectedVideo = storedSelectedVideo
-      ? JSON.parse(storedSelectedVideo)
-      : defaultVideos[0];
-
-    setVideoList(parsedVideoList);
-    setselectedVideo(parsedSelectedVideo);
-  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !selectedVideo?.id) return;
+    if (!video || !selectedVideo?._id) return;
 
     const handleLoadedMetadata = () => {
       setDuration(Math.floor(video.duration));
-    };
+      setCurrentTime(0);
 
-    const savedTime = localStorage.getItem(getStorageKeyTime(selectedVideo.id));
-    if (savedTime) {
-      video.currentTime = parseFloat(savedTime);
-    }
+      const savedProgress = videoProgressMap[selectedVideo._id];
+      if (savedProgress?.currentTime) {
+        video.currentTime = savedProgress.currentTime;
+        setCurrentTime(savedProgress.currentTime);
+      }
+    };
 
     const handleTimeUpdate = () => {
       const currentSecond = Math.floor(video.currentTime);
       setCurrentTime(video.currentTime);
 
-      setWatchedSeconds((prev) => {
-        if (prev.has(currentSecond)) return prev;
-        const newSet = new Set(prev);
-        newSet.add(currentSecond);
-        return newSet;
+      setVideoProgressMap((prev) => {
+        const videoId = selectedVideo._id;
+        const videoData = prev[videoId] || {
+          watched: new Set(),
+          currentTime: 0,
+        };
+
+        const newWatched = new Set(videoData.watched);
+        newWatched.add(currentSecond);
+
+        return {
+          ...prev,
+          [videoId]: {
+            watched: newWatched,
+            currentTime: video.currentTime,
+          },
+        };
       });
     };
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
     video.addEventListener("timeupdate", handleTimeUpdate);
-    video.addEventListener("play", handlePlay);
-    video.addEventListener("pause", handlePause);
+    video.addEventListener("play", () => setIsPlaying(true));
+    video.addEventListener("pause", () => setIsPlaying(false));
 
     return () => {
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("timeupdate", handleTimeUpdate);
-      video.removeEventListener("play", handlePlay);
-      video.removeEventListener("pause", handlePause);
+      video.removeEventListener("play", () => setIsPlaying(true));
+      video.removeEventListener("pause", () => setIsPlaying(false));
     };
-  }, [videoRef, selectedVideo]); // Dependencies include videoRef and selectedVideo
-
-  useEffect(() => {
-    if (!selectedVideo?.id || !watchedSeconds) return;
-
-    localStorage.setItem(
-      getStorageKeySeconds(selectedVideo.id),
-      JSON.stringify(Array.from(watchedSeconds))
-    );
-  }, [watchedSeconds]);
-
-  useEffect(() => {
-    if (!selectedVideo?.id || !currentTime) return;
-    localStorage.setItem(
-      getStorageKeyTime(selectedVideo.id),
-      currentTime.toString()
-    );
-  }, [currentTime]);
-
-  useEffect(() => {
-    if (!selectedVideo?.id) return;
-    try {
-      const savedSeconds = localStorage.getItem(
-        getStorageKeySeconds(selectedVideo?.id)
-      );
-      const parsedSeconds = savedSeconds
-        ? new Set(JSON.parse(savedSeconds))
-        : new Set();
-      setWatchedSeconds(parsedSeconds);
-      console.log(JSON.parse(savedSeconds));
-    } catch {
-      setWatchedSeconds(new Set());
-    }
-
-    try {
-      const savedTime = localStorage.getItem(
-        getStorageKeyTime(selectedVideo?.id)
-      );
-      console.log(parseFloat(savedTime));
-      setCurrentTime(savedTime ? parseFloat(savedTime) : 0);
-    } catch {
-      setCurrentTime(0);
-    }
   }, [selectedVideo]);
 
-  useEffect(() => {
-    if (videoRef.current && duration > 0) {
-      videoRef.current.currentTime = currentTime;
-    }
-  }, [duration]);
+
 
   const resetProgress = () => {
-    setWatchedSeconds(new Set());
+    setVideoProgressMap((prev) => ({
+      ...prev,
+      [selectedVideo._id]: {
+        watched: new Set(),
+        currentTime: 0,
+      },
+    }));
     setCurrentTime(0);
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
       videoRef.current.pause();
     }
-    localStorage.removeItem(getStorageKeySeconds(selectedVideo.id));
-    localStorage.removeItem(getStorageKeyTime(selectedVideo.id));
   };
 
   const togglePlayPause = () => {
@@ -193,191 +152,266 @@ const WatchedVideo = () => {
     }
   };
 
+  const handleVideoSelect = (video) => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+    }
+    setSelectedVideo(video);
+    setIsPlaying(false);
+  };
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  let progressPercent = 0;
+  const getVideoProgress = (videoId) => {
+    const progressData = videoProgressMap[videoId];
+    if (!progressData || !progressData.watched) return 0;
 
-  if (
-    watchedSeconds?.size === 1 &&
-    watchedSeconds.values().next().value === 0
-  ) {
-    progressPercent = 0;
-  } else {
-    progressPercent =
-      duration > 0 ? (watchedSeconds?.size / duration) * 100 : 0;
-  }
+    // For playlist items, use the stored duration or estimate
+    const videoDuration = videoId === selectedVideo._id ? duration : 600; // fallback duration
+    return videoDuration > 0
+      ? (progressData.watched.size / videoDuration) * 100
+      : 0;
+  };
 
+  const watchedSeconds =
+    videoProgressMap[selectedVideo?._id]?.watched || new Set();
+  const progressPercent =
+    duration > 0 ? (watchedSeconds.size / duration) * 100 : 0;
   const intervals = secondsToIntervals(watchedSeconds);
 
-  if (!selectedVideo?.id) return <div>loading...</div>;
+  if (!selectedVideo?._id) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-center">
+          <Video className="mx-auto h-12 w-12 text-slate-400 mb-4" />
+          <p className="text-slate-600">Loading video player...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-gray-50 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">
-        Video Progress Tracker
-      </h2>
-
-      <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-        <h3 className="text-lg font-semibold text-gray-700 mb-3">
-          Add Custom Video URL
-        </h3>
-        <div className="flex gap-2">
-          <input
-            type="url"
-            value={customUrl}
-            onChange={(e) => setCustomUrl(e.target.value)}
-            placeholder="Enter video URL (e.g., https://example.com/video.mp4)"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <button
-            onClick={addCustomVideo}
-            disabled={!customUrl.trim()}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-          >
-            Add Video
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-        <h3 className="text-lg font-semibold text-gray-700 mb-3">
-          Select Video
-        </h3>
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedVideo?.id}
-            onChange={(e) => {
-              const selected = videoList.find((f) => f.id === e.target.value);
-              localStorage.setItem("selectedVideo", JSON.stringify(selected));
-              setselectedVideo(selected);
-            }}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {videoList.map((video) => (
-              <option key={video.id} value={video.id}>
-                {video.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
-        <video
-          ref={videoRef}
-          src={selectedVideo.url}
-          controls
-          className="w-full h-full object-contain"
-        />
-      </div>
-
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={togglePlayPause}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          {isPlaying ? (
-            <span className="flex items-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-1"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Pause
-            </span>
-          ) : (
-            <span className="flex items-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-1"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Play
-            </span>
-          )}
-        </button>
-
-        <div className="text-gray-700 font-medium">
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm font-medium text-gray-700">Progress</span>
-          <span className="text-sm font-medium text-gray-700">
-            Watched: {progressPercent.toFixed(1)}%
-          </span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div
-            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <button
-          onClick={resetProgress}
-          className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50"
-        >
-          Reset Progress
-        </button>
-      </div>
-
-      <div className="bg-gray-100 p-4 rounded-lg mb-4">
-        <h4 className="font-bold text-gray-800 mb-2">Watch Progress:</h4>
-        <p className="text-sm text-gray-600 mb-1">
-          Current Time: {currentTime?.toFixed(1)}s
-        </p>
-        <p className="text-sm text-gray-600 mb-1">
-          Watched Seconds: {watchedSeconds?.size} / {duration} seconds
-        </p>
-        <p className="text-sm text-gray-600">
-          Progress: {progressPercent.toFixed(2)}%
-        </p>
-      </div>
-
-      <div className="bg-gray-100 p-4 rounded-lg">
-        <h4 className="font-bold text-gray-800 mb-2">Watched Intervals:</h4>
-        {intervals?.length === 0 ? (
-          <p className="text-gray-500 italic">No intervals watched yet</p>
-        ) : (
-          <div className="space-y-2">
-            {intervals?.map(([start, end], index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between bg-white px-3 py-2 rounded-md shadow-sm border-l-4 border-blue-400"
-              >
-                <span className="font-mono text-sm text-gray-700">
-                  {start === end ? `${start}s` : `${start}s - ${end}s`}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {start === end ? "1 sec" : `${end - start + 1} secs`}
-                </span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <div className="max-w-7xl mx-auto p-4 lg:p-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          {/* Sidebar - Video List */}
+          <aside className=" xl:col-span-1 order-2 xl:order-1">
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Video className="h-5 w-5" />
+                  Video Playlist
+                </h3>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className=" p-4 h-100max-h-96 overflow-y-auto custom-scrollbar">
+                <div className="space-y-3 ">
+                  {videoList.map((video, index) => {
+                    const progress = getVideoProgress(video._id);
+                    const isActive = selectedVideo?._id === video._id;
+
+                    return (
+                      <div
+                        key={video._id}
+                        onClick={() => handleVideoSelect(video)}
+                        className={`group cursor-pointer p-4 rounded-xl transition-all duration-200 border-2 ${
+                          isActive
+                            ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 shadow-md"
+                            : "bg-slate-50 border-transparent hover:bg-slate-100 hover:shadow-sm"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                              isActive
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-300 text-slate-600 group-hover:bg-slate-400"
+                            }`}
+                          >
+                            {index + 1}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <h4
+                              className={`font-semibold text-sm leading-tight mb-2 ${
+                                isActive ? "text-blue-900" : "text-slate-800"
+                              }`}
+                            >
+                              {video.title ||
+                                video.name ||
+                                `Video ${index + 1}`}
+                            </h4>
+
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-xs text-slate-500">
+                                <span>Progress</span>
+                                <span>{progress.toFixed(0)}%</span>
+                              </div>
+
+                              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    progress > 0
+                                      ? "bg-gradient-to-r from-green-400 to-emerald-500"
+                                      : "bg-slate-300"
+                                  }`}
+                                  style={{
+                                    width: `${Math.min(progress, 100)}%`,
+                                  }}
+                                />
+                              </div>
+
+                              {progress >= 90 && (
+                                <div className="flex items-center gap-1 text-emerald-600 text-xs">
+                                  <CheckCircle className="h-3 w-3" />
+                                  <span>Almost Complete</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Content - Video Player */}
+          <main className="xl:col-span-3 order-1 xl:order-2">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-xl font-bold text-white">
+                    {selectedVideo.title || "Video Player"}
+                  </h1>
+                  <div className="flex items-center gap-2 text-slate-300 text-sm">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Video Container */}
+              <div className="p-6">
+                <div className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-lg mb-6">
+                  <video
+                    ref={videoRef}
+                    controls
+                    src={selectedVideo?.videoUrl}
+                    className="w-full h-full object-contain"
+                    onVolumeChange={(e) => setVolume(e.target.volume)}
+                  />
+                </div>
+
+                {/* Controls */}
+                <div className="space-y-4">
+                  {/* Progress Bar */}
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-semibold text-slate-700">
+                        Watch Progress
+                      </span>
+                      <span className="text-sm font-bold text-blue-600">
+                        {progressPercent.toFixed(1)}% Complete
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-500 shadow-sm"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
+                      <span>{formatTime(currentTime)}</span>
+                      <span>
+                        {watchedSeconds.size} / {duration} seconds watched
+                      </span>
+                      <span>{formatTime(duration)}</span>
+                    </div>
+                  </div>
+
+                  {/* Control Buttons */}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={togglePlayPause}
+                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg"
+                    >
+                      {isPlaying ? (
+                        <>
+                          <Pause className="h-4 w-4" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Play
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={resetProgress}
+                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset Progress
+                    </button>
+                  </div>
+
+                  {/* Watched Intervals */}
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      Watched Segments
+                    </h4>
+
+                    {intervals?.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Clock className="mx-auto h-12 w-12 text-slate-300 mb-2" />
+                        <p className="text-slate-500 italic">
+                          No segments watched yet
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Start watching to see your progress
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-2  overflow-y-auto custom-scrollbar">
+                        {intervals?.map(([start, end], index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between bg-white px-4 py-3 rounded-lg shadow-sm border-l-4 border-green-400 hover:shadow-md transition-shadow duration-200"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                <span className="text-xs font-bold text-green-600">
+                                  {index + 1}
+                                </span>
+                              </div>
+                              <span className="font-medium text-slate-700">
+                                {formatTime(start)} - {formatTime(end)}
+                              </span>
+                            </div>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                              {end - start + 1}s
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

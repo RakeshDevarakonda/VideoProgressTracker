@@ -9,6 +9,7 @@ app.get("/", (req, res) => {
   res.send("index");
 });
 
+app.use(express.json());
 app.use(cors());
 
 app.use("/api", progressRouter);
