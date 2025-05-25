@@ -9,9 +9,7 @@ import { store } from "./Store/store.jsx";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
+      <App />
     </Provider>
   </StrictMode>
 );

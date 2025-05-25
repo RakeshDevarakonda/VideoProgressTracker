@@ -2,37 +2,57 @@ import React, { useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import VideoList from "./VideoList";
 import VideoPlayer from "./VideoPlayer";
-import { useGetVideoList } from "../TanstackQueries/GetAllVideosQuery";
 import {
   setVideoList,
   setSelectedVideo,
   videoProgressSelector,
   setInitialVideoProgress,
 } from "../Redux/VideoListRedux.jsx";
+import { fetchVideoList } from "../Apis/VideoListAPi.jsx";
 
 const VideoProgressTracker = () => {
   const dispatch = useDispatch();
-  const { data, isSuccess } = useGetVideoList();
 
+  const { selectedVideo } = useSelector(videoProgressSelector);
   useEffect(() => {
-    if (data && isSuccess) {
-      const newData = data.progress;
-      const userId = data.userId;
-      const lastPlayedUrl = data.lastPlayedUrl;
+    const fetchData = async () => {
+      try {
+        const data = await fetchVideoList();
 
-      let dataIndex = 0;
+        if (data && data.progress) {
+          const newData = data.progress;
+          const userId = data.userId;
+          const lastPlayedUrl = data.lastPlayedUrl;
 
-      if (lastPlayedUrl) {
-        const index = newData.findIndex((e) => e.videoUrl === lastPlayedUrl);
-        dataIndex = index !== -1 ? index : 0;
+          let dataIndex = 0;
+
+          if (lastPlayedUrl) {
+            const index = newData.findIndex(
+              (e) => e.videoUrl === lastPlayedUrl
+            );
+            dataIndex = index !== -1 ? index : 0;
+          }
+
+          localStorage.setItem("userId", userId);
+          dispatch(setVideoList(newData));
+          dispatch(setSelectedVideo(newData[dataIndex]));
+          dispatch(setInitialVideoProgress(newData));
+        }
+      } catch (error) {
+        console.error("Error fetching video list:", error.message);
       }
+    };
 
-      localStorage.setItem("userId", userId);
-      dispatch(setVideoList(newData));
-      dispatch(setSelectedVideo(newData[dataIndex]));
-      dispatch(setInitialVideoProgress(newData));
-    }
-  }, [data, isSuccess, dispatch]);
+    fetchData();
+  }, []);
+
+  if (!selectedVideo) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-opacity-50"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">

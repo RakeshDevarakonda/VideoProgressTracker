@@ -10,7 +10,15 @@ app.get("/", (req, res) => {
 });
 
 app.use(express.json());
-app.use(cors());
+
+const corsOptions = {
+  origin: [
+    process.env.FRONTEND_URL1,
+    process.env.FRONTEND_URL2,
+    process.env.FRONTEND_URL3,
+  ],
+};
+app.use(cors(corsOptions));
 
 app.use("/api", progressRouter);
 

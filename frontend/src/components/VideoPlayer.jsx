@@ -26,7 +26,6 @@ const VideoPlayer = () => {
     videoProgressSelector
   );
 
-  console.log(videoProgressMap);
   const duration = videoProgressMap[selectedVideo?._id]?.duration;
 
   const currentTime = videoProgressMap[selectedVideo?._id]?.currentTime;
@@ -117,7 +116,6 @@ const VideoPlayer = () => {
   }, [selectedVideo, dispatch]);
 
   const saveProgressToServer = async (runImmediate) => {
-    // console.log(runImmediate);
     const videoProgress = videoProgressMap[selectedVideo?._id];
 
     if (!videoProgress) return;
@@ -157,11 +155,8 @@ const VideoPlayer = () => {
     const currentVideo = videoRef.current;
     const prevVideo = previousVideoRef.current;
 
-    console.log(prevVideo?._id, selectedVideo?._id);
-
     if (prevVideo && prevVideo?._id !== selectedVideo?._id) {
       const prevProgress = videoProgressMap[prevVideo._id];
-      console.log(prevProgress?.watched);
 
       if (prevProgress && currentVideo) {
         saveVideoProgress({
@@ -211,7 +206,7 @@ const VideoPlayer = () => {
     }
   };
 
-  if (!selectedVideo) return null;
+
 
   return (
     <main className="xl:col-span-3 order-1 xl:order-2">
@@ -220,7 +215,7 @@ const VideoPlayer = () => {
         <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-white">
-              {selectedVideo.title || "Video Player"}
+              {selectedVideo?.title || "Video Player"}
             </h1>
             <div className="flex items-center gap-2 text-slate-300 text-sm">
               <Clock className="h-4 w-4" />
