@@ -243,7 +243,7 @@ const VideoPlayer = () => {
                   Watch Progress
                 </span>
                 <span className="text-sm font-bold text-blue-600">
-                  {Math.min(Math.round(progressPercent))}%
+                  {Math.floor(progressPercent)}%
                 </span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
