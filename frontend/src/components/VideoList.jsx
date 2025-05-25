@@ -1,9 +1,27 @@
 import { Video, CheckCircle } from "lucide-react";
-import { setSelectedVideo } from "../Redux/VideoListRedux";
-import { useDispatch } from "react-redux";
+import {
+  setSelectedVideo,
+  videoProgressSelector,
+} from "../Redux/VideoListRedux";
+import { useDispatch, useSelector } from "react-redux";
 
-const VideoList = ({ videoList, selectedVideo, getVideoProgress }) => {
+const VideoList = () => {
   const dispatch = useDispatch();
+  const { videoList, selectedVideo, videoProgressMap } = useSelector(
+    videoProgressSelector
+  );
+
+  const duration = videoProgressMap[selectedVideo?._id]?.duration;
+
+  const getVideoProgress = (id) => {
+    const watchedArray = videoProgressMap[id]?.watched || [];
+    const filteredWatched = watchedArray.filter((second) => second !== 0);
+    const videoDuration = videoProgressMap[id]?.duration || duration;
+    return videoDuration > 0
+      ? (filteredWatched.length / videoDuration) * 100
+      : 0;
+  };
+
   return (
     <aside className=" xl:col-span-1 order-2 xl:order-1">
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -16,7 +34,7 @@ const VideoList = ({ videoList, selectedVideo, getVideoProgress }) => {
 
         <div className=" p-4 h-100max-h-96 overflow-y-auto custom-scrollbar">
           <div className="space-y-3 ">
-            {videoList.map((video, index) => {
+            {videoList?.map((video, index) => {
               const progress = getVideoProgress(video._id);
               const isActive = selectedVideo?._id === video._id;
 
@@ -53,7 +71,7 @@ const VideoList = ({ videoList, selectedVideo, getVideoProgress }) => {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-xs text-slate-500">
                           <span>Progress</span>
-                          <span>{progress.toFixed(0)}%</span>
+                          <span>{Math.min(Math.round(progress), 100)}%</span>
                         </div>
 
                         <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
@@ -64,17 +82,32 @@ const VideoList = ({ videoList, selectedVideo, getVideoProgress }) => {
                                 : "bg-slate-300"
                             }`}
                             style={{
-                              width: `${Math.min(progress, 100)}%`,
+                              width: `${Math.min(Math.round(progress), 100)}%`,
                             }}
                           />
                         </div>
 
-                        {progress >= 90 && (
+                        {Math.round(progress) >= 100 ? (
                           <div className="flex items-center gap-1 text-emerald-600 text-xs">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Completed</span>
+                          </div>
+                        ) : Math.round(progress) >= 80 ? (
+                          <div className="flex items-center gap-1 text-amber-500 text-xs">
                             <CheckCircle className="h-3 w-3" />
                             <span>Almost Complete</span>
                           </div>
-                        )}
+                        ) : Math.round(progress) >= 40 ? (
+                          <div className="flex items-center gap-1 text-yellow-500 text-xs">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Halfway There</span>
+                          </div>
+                        ) : Math.round(progress) > 0 ? (
+                          <div className="flex items-center gap-1 text-gray-500 text-xs">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Just Started</span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

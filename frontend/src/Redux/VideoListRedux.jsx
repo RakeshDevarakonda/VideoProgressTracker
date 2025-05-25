@@ -2,8 +2,6 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   videoProgressMap: {},
-  duration: 0,
-  currentTime: 0,
   isPlaying: false,
   videoList: null,
   selectedVideo: null,
@@ -13,15 +11,6 @@ const videoProgresSlice = createSlice({
   name: "videoProgress",
   initialState: initialState,
   reducers: {
-    setVideoProgressMap: (state, action) => {
-      state.videoProgressMap = action.payload;
-    },
-    setDuration: (state, action) => {
-      state.duration = action.payload;
-    },
-    setCurrentTime: (state, action) => {
-      state.currentTime = action.payload;
-    },
     setIsPlaying: (state, action) => {
       state.isPlaying = action.payload;
     },
@@ -37,21 +26,46 @@ const videoProgresSlice = createSlice({
       state.currentTime = 0;
     },
     updateVideoProgress: (state, action) => {
-      const { videoId, currentSecond, currentTime } = action.payload;
+      const { videoId, currentSecond, currentTime, duration } = action.payload;
+
       if (!state.videoProgressMap[videoId]) {
-        state.videoProgressMap[videoId] = { watched: [], currentTime: 0 };
+        state.videoProgressMap[videoId] = {
+          watched: [],
+          currentTime: 0,
+          duration: 0,
+        };
       }
 
       const watchedArray = state.videoProgressMap[videoId].watched || [];
+
       if (!watchedArray.includes(currentSecond)) {
         state.videoProgressMap[videoId] = {
           ...state.videoProgressMap[videoId],
           watched: [...watchedArray, currentSecond],
-          currentTime: currentTime,
+          currentTime,
+          duration: duration ?? state.videoProgressMap[videoId].duration,
         };
       } else {
         state.videoProgressMap[videoId].currentTime = currentTime;
+        state.videoProgressMap[videoId].duration =
+          duration ?? state.videoProgressMap[videoId].duration;
       }
+    },
+
+    setInitialVideoProgress: (state, action) => {
+      const videos = action.payload;
+
+      videos.forEach((video) => {
+        const videoId = video._id;
+
+        if (!state.videoProgressMap[videoId]) {
+          state.videoProgressMap[videoId] = {
+            watched: video.watched || [],
+            currentTime: video.currentTime || 0,
+            duration: video.duration || 0,
+          };
+        }
+      });
     },
   },
 });
@@ -59,9 +73,7 @@ const videoProgresSlice = createSlice({
 export const videoProgressReducer = videoProgresSlice.reducer;
 
 export const {
-  setVideoProgressMap,
-  setDuration,
-  setCurrentTime,
+  setInitialVideoProgress,
   setIsPlaying,
   setVideoList,
   setSelectedVideo,

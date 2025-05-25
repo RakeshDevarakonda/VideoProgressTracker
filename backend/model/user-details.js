@@ -4,9 +4,11 @@ const userSchema = new Schema({
   userId: {
     type: String,
     required: true,
+    unique: true,
   },
   lastPlayedUrl: {
     type: String,
+    default: null,
   },
 });
 

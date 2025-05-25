@@ -1,25 +1,17 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose from "mongoose";
 
-const userVideoProgressTrack = new Schema({
-  watchedSeconds: {
-    type: [Number],
-    default: [],
+const VideoProgressSchema = new mongoose.Schema(
+  {
+    userId: { type: String, required: true },
+    videoUrl: { type: String, required: true },
+    watched: { type: [Number], default: [] },
+    currentTime: { type: Number, default: 0 },
+  
   },
-  videoUrl: {
-    type: String,
-    required: true,
-  },
-  currentTime: {
-    type: Number,
-    default: 0,
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-});
+  { timestamps: true }
+);
 
-export const UserVideoProgress = mongoose.model(
-  "UserVideoProgress",
-  userVideoProgressTrack
+export const VideoProgress = mongoose.model(
+  "VideoProgress",
+  VideoProgressSchema
 );

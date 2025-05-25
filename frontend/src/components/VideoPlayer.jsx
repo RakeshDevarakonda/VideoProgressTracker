@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Play, Pause, RotateCcw, Clock, CheckCircle } from "lucide-react";
+import axios from "axios";
+
 import {
-  setDuration,
-  setCurrentTime,
   setIsPlaying,
   resetProgress,
   updateVideoProgress,
@@ -12,17 +12,30 @@ import {
 import { secondsToIntervals, formatTime } from "../utils/utils";
 
 const VideoPlayer = () => {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const dispatch = useDispatch();
   const videoRef = useRef(null);
 
-  const { selectedVideo, videoProgressMap, duration, currentTime, isPlaying } =
-    useSelector(videoProgressSelector);
+  const lastTimeRef = useRef(0);
 
-  const watchedSeconds = new Set(
-    videoProgressMap[selectedVideo?._id]?.watched || []
+  const { selectedVideo, videoProgressMap, isPlaying } = useSelector(
+    videoProgressSelector
   );
-  const progressPercent =
-    duration > 0 ? ((watchedSeconds.size - 1) / duration) * 100 : 0;
+
+  const duration = videoProgressMap[selectedVideo?._id]?.duration;
+
+  const currentTime = videoProgressMap[selectedVideo?._id]?.currentTime;
+
+  const watchedSeconds = useMemo(() => {
+    return new Set(videoProgressMap[selectedVideo?._id]?.watched || []);
+  }, [videoProgressMap, selectedVideo?._id]);
+
+  const progressPercent = useMemo(() => {
+    const adjustedSize =
+      watchedSeconds.size >= 1 ? watchedSeconds.size - 1 : watchedSeconds.size;
+    return duration > 0 ? (adjustedSize / duration) * 100 : 0;
+  }, [watchedSeconds, duration]);
+
   const intervals = secondsToIntervals(watchedSeconds);
 
   useEffect(() => {
@@ -30,18 +43,30 @@ const VideoPlayer = () => {
     if (!video || !selectedVideo?._id) return;
 
     const handleLoadedMetadata = () => {
-      dispatch(setDuration(Math.floor(video.duration)));
-      dispatch(setCurrentTime(0));
+      const videoDuration = Math.floor(video.duration);
+      const currentVideoId = selectedVideo._id;
 
-      const savedProgress = videoProgressMap[selectedVideo._id];
+      const savedProgress = videoProgressMap[currentVideoId];
+
       if (savedProgress?.currentTime) {
         video.currentTime = savedProgress.currentTime;
-        dispatch(setCurrentTime(savedProgress.currentTime));
       }
+
+      dispatch(
+        updateVideoProgress({
+          videoId: currentVideoId,
+          currentSecond: 0,
+          currentTime: savedProgress?.currentTime || 0,
+          duration: videoDuration,
+        })
+      );
     };
 
     const handlePlay = () => dispatch(setIsPlaying(true));
-    const handlePause = () => dispatch(setIsPlaying(false));
+    const handlePause = () => {
+      dispatch(setIsPlaying(false));
+      saveProgressToServer(true);
+    };
 
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
     video.addEventListener("play", handlePlay);
@@ -60,24 +85,80 @@ const VideoPlayer = () => {
 
     let animationId;
 
-    const trackFrame = () => {
+    const trackProgress = () => {
       if (!video.paused && !video.ended) {
         const currentSecond = Math.floor(video.currentTime);
-        dispatch(setCurrentTime(video.currentTime));
+        const currentTime = video.currentTime;
+        const duration = video.duration;
+
         dispatch(
           updateVideoProgress({
             videoId: selectedVideo._id,
             currentSecond,
-            currentTime: video.currentTime,
+            currentTime,
+            duration,
           })
         );
       }
-      animationId = requestAnimationFrame(trackFrame);
+
+      animationId = requestAnimationFrame(trackProgress);
     };
 
-    animationId = requestAnimationFrame(trackFrame);
-    return () => cancelAnimationFrame(animationId);
+    animationId = requestAnimationFrame(trackProgress);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
   }, [selectedVideo, dispatch]);
+
+  const saveProgressToServer = async (runImmediate) => {
+    // console.log(runImmediate);
+    const videoProgress = videoProgressMap[selectedVideo?._id];
+
+    if (!videoProgress) return;
+
+    const video = videoRef.current;
+
+    if (!runImmediate) {
+      if (!video || !selectedVideo?._id || video.paused || video.ended) return;
+
+      const currentSecond = Math.floor(video.currentTime);
+
+      if (videoProgress?.watched.includes(currentSecond)) return;
+    }
+
+    const timeDiff = Math.abs(Date.now() - lastTimeRef.current);
+
+    if (!runImmediate) {
+      if (timeDiff < 5000) return;
+    }
+
+    try {
+      lastTimeRef.current = Date.now();
+      await axios.put(`${API_BASE_URL}/updateProgress`, {
+        userId: localStorage.getItem("userId"),
+        videoId: selectedVideo._id,
+        videoUrl: selectedVideo.videoUrl,
+        currentTime: video.currentTime,
+        duration: video.duration,
+        watchedSeconds: videoProgress?.watched || [],
+      });
+
+      console.log(videoProgress?.watched);
+      console.log("api call");
+    } catch (error) {
+      console.error("Progress save failed:", error);
+    }
+  };
+
+  useEffect(() => {
+    saveProgressToServer(true);
+    lastTimeRef.current = 0;
+  }, [selectedVideo?._id]);
+
+  useEffect(() => {
+    saveProgressToServer();
+  }, [videoProgressMap]);
 
   const togglePlayPause = () => {
     const video = videoRef.current;
@@ -113,7 +194,7 @@ const VideoPlayer = () => {
             </h1>
             <div className="flex items-center gap-2 text-slate-300 text-sm">
               <Clock className="h-4 w-4" />
-              <span>{formatTime(duration)}</span>
+              <span>{Math.floor(duration)}</span>
             </div>
           </div>
         </div>
@@ -138,21 +219,24 @@ const VideoPlayer = () => {
                   Watch Progress
                 </span>
                 <span className="text-sm font-bold text-blue-600">
-                  {progressPercent.toFixed(1)}% Complete
+                  {Math.min(Math.round(progressPercent))}%
                 </span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all duration-500 shadow-sm"
-                  style={{ width: `${progressPercent}%` }}
+                  style={{
+                    width: `${Math.min(progressPercent.toFixed(0), 100)}%`,
+                  }}
                 />
               </div>
               <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
                 <span>{formatTime(currentTime)}</span>
                 <span>
-                  {watchedSeconds.size - 1} / {duration} seconds watched
+                  {watchedSeconds.size - 1} / {Math.floor(duration)} seconds
+                  watched
                 </span>
-                <span>{formatTime(duration)}</span>
+                <span>{Math.floor(duration)}</span>
               </div>
             </div>
 
@@ -175,13 +259,13 @@ const VideoPlayer = () => {
                 )}
               </button>
 
-              <button
+              {/* <button
                 onClick={handleResetProgress}
                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg"
               >
                 <RotateCcw className="h-4 w-4" />
                 Reset Progress
-              </button>
+              </button> */}
             </div>
 
             {/* Watched Intervals */}

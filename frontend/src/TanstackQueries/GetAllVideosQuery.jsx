@@ -5,11 +5,7 @@ export const useGetVideoList = () => {
   return useQuery({
     queryKey: ["getVideoList"],
     queryFn: fetchVideoList,
-    onSuccess: (data) => {
-      console.log("✅ Auth fetch successful:", data);
-    },
-    onError: (error) => {
-      console.error("❌ Error fetching auth:", error.message);
-    },
+    staleTime: 1000 * 60 * 60,
+    gcTime: 1000 * 60 * 120,
   });
 };
