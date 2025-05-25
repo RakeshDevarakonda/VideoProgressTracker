@@ -11,16 +11,22 @@ const VideoList = () => {
     videoProgressSelector
   );
 
+  console.log(videoProgressMap)
+
   const duration = videoProgressMap[selectedVideo?._id]?.duration;
 
   const getVideoProgress = (id) => {
     const watchedArray = videoProgressMap[id]?.watched || [];
     const filteredWatched = watchedArray.filter((second) => second !== 0);
     const videoDuration = videoProgressMap[id]?.duration || duration;
+    console.log(filteredWatched)
+
+    console.log(videoDuration)
     return videoDuration > 0
       ? (filteredWatched.length / videoDuration) * 100
       : 0;
   };
+  
 
   return (
     <aside className=" xl:col-span-1 order-2 xl:order-1">

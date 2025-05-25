@@ -24,12 +24,14 @@ export const getAllVideosController = async (req, res) => {
       await lastplayedUser.save();
 
       const allVideos = await VideoList.find();
+      console.log(allVideos);
 
       const progressToCreate = allVideos.map((video) => ({
         userId,
         videoUrl: video.videoUrl,
         watchedSeconds: [],
         currentTime: 0,
+        duration: video.duration,
       }));
 
       await VideoProgress.insertMany(progressToCreate);
@@ -51,7 +53,7 @@ export const updateProgress = async (req, res) => {
   try {
     console.log("Received updateProgress request");
 
-    const { userId, videoId, videoUrl, currentTime, duration, watchedSeconds } =
+    const { userId, videoId, currentTime, watchedSeconds } =
       req.body;
 
     if (!userId || !videoId) {
@@ -71,12 +73,9 @@ export const updateProgress = async (req, res) => {
         .json({ message: "Video progress not found for user" });
     }
 
-    await User.updateOne({ userId }, { $set: { lastPlayedUrl: videoUrl } });
-
     console.log(User);
     const updateFields = {
       currentTime,
-      duration,
     };
 
     const updateResult = await VideoProgress.updateOne(

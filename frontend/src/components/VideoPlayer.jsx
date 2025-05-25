@@ -10,18 +10,23 @@ import {
   videoProgressSelector,
 } from "../Redux/VideoListRedux.jsx";
 import { secondsToIntervals, formatTime } from "../utils/utils";
+import {
+  saveVideoProgress,
+  updateLastPlayedVideo,
+} from "../Apis/UpdateVideoProgressApi.jsx";
 
 const VideoPlayer = () => {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const dispatch = useDispatch();
   const videoRef = useRef(null);
-
+  const previousVideoRef = useRef(null);
   const lastTimeRef = useRef(0);
 
   const { selectedVideo, videoProgressMap, isPlaying } = useSelector(
     videoProgressSelector
   );
 
+  console.log(videoProgressMap);
   const duration = videoProgressMap[selectedVideo?._id]?.duration;
 
   const currentTime = videoProgressMap[selectedVideo?._id]?.currentTime;
@@ -135,24 +140,49 @@ const VideoPlayer = () => {
 
     try {
       lastTimeRef.current = Date.now();
-      await axios.put(`${API_BASE_URL}/updateProgress`, {
-        userId: localStorage.getItem("userId"),
+
+      await saveVideoProgress({
         videoId: selectedVideo._id,
         videoUrl: selectedVideo.videoUrl,
         currentTime: video.currentTime,
         duration: video.duration,
         watchedSeconds: videoProgress?.watched || [],
       });
-
-      console.log(videoProgress?.watched);
-      console.log("api call");
     } catch (error) {
       console.error("Progress save failed:", error);
     }
   };
 
   useEffect(() => {
-    saveProgressToServer(true);
+    const currentVideo = videoRef.current;
+    const prevVideo = previousVideoRef.current;
+
+    console.log(prevVideo?._id, selectedVideo?._id);
+
+    if (prevVideo && prevVideo?._id !== selectedVideo?._id) {
+      const prevProgress = videoProgressMap[prevVideo._id];
+      console.log(prevProgress?.watched);
+
+      if (prevProgress && currentVideo) {
+        saveVideoProgress({
+          videoId: prevVideo._id,
+          videoUrl: prevVideo.videoUrl,
+          currentTime: currentVideo.currentTime,
+          duration: currentVideo.duration,
+          watchedSeconds: prevProgress?.watched || [],
+        }).catch((err) => {
+          console.error("Failed to save previous video progress", err);
+        });
+      }
+    }
+    previousVideoRef.current = selectedVideo;
+
+    if (selectedVideo?._id) {
+      updateLastPlayedVideo(selectedVideo?.videoUrl).catch((err) => {
+        console.error("Failed to update last played video", err);
+      });
+    }
+
     lastTimeRef.current = 0;
   }, [selectedVideo?._id]);
 

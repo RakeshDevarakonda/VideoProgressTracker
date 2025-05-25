@@ -6,7 +6,7 @@ const VideoProgressSchema = new mongoose.Schema(
     videoUrl: { type: String, required: true },
     watched: { type: [Number], default: [] },
     currentTime: { type: Number, default: 0 },
-  
+    duration: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
