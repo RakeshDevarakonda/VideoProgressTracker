@@ -19,7 +19,7 @@ const VideoList = () => {
     const videoDuration = videoProgressMap[id]?.duration || duration;
 
     return videoDuration > 0
-      ? (filteredWatched.length / videoDuration) * 100
+      ? (filteredWatched.length / Math.floor(videoDuration)) * 100
       : 0;
   };
 

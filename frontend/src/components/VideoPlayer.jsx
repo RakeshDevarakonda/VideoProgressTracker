@@ -34,10 +34,11 @@ const VideoPlayer = () => {
     return new Set(videoProgressMap[selectedVideo?._id]?.watched || []);
   }, [videoProgressMap, selectedVideo?._id]);
 
+
   const progressPercent = useMemo(() => {
     const adjustedSize =
       watchedSeconds.size >= 1 ? watchedSeconds.size - 1 : watchedSeconds.size;
-    return duration > 0 ? (adjustedSize / duration) * 100 : 0;
+    return duration > 0 ? (adjustedSize / Math.floor(duration)) * 100 : 0;
   }, [watchedSeconds, duration]);
 
   const intervals = secondsToIntervals(watchedSeconds);
@@ -205,8 +206,6 @@ const VideoPlayer = () => {
       }
     }
   };
-
-
 
   return (
     <main className="xl:col-span-3 order-1 xl:order-2">
