@@ -7,7 +7,7 @@ export const fetchVideoList = async () => {
 
 console.log("api called")
   try {
-    const response = await axios.get(`${API_BASE_URL}/getAllVideos`, {
+    const response = await axios.get(`${API_BASE_URL}/api/getAllVideos`, {
       params: { userId },
     });
 
