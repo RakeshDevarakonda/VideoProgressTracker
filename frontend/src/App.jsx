@@ -1,6 +1,6 @@
 import React from "react";
-import WatchedVideo from "./components/VideoProgressTracker";
+import VideoProgressTracker from "./components/VideoProgressTracker";
 
 export default function App() {
-  return <WatchedVideo />;
+  return <VideoProgressTracker />;
 }
