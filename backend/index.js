@@ -6,7 +6,7 @@ import cors from "cors";
 import "dotenv/config";
 
 app.get("/", (req, res) => {
-  res.send("index");
+  res.redirect("https://video-progress-tracker-coral.vercel.app/");
 });
 
 app.use(express.json());
