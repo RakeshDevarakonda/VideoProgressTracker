@@ -6,7 +6,7 @@ export const saveVideoProgress = async (data) => {
   console.log("updated called")
 
   try {
-    const response = await axios.put(`${API_BASE_URL}/updateProgress`, {
+    const response = await axios.put(`${API_BASE_URL}/api/updateProgress`, {
       userId: localStorage.getItem("userId"),
       ...data,
     });
@@ -20,7 +20,7 @@ export const saveVideoProgress = async (data) => {
 export const updateLastPlayedVideo = async (videoUrl) => {
   console.log("lastplayed called")
   try {
-    const response = await axios.put(`${API_BASE_URL}/updateLastPlayed`, {
+    const response = await axios.put(`${API_BASE_URL}/api/updateLastPlayed`, {
       userId: localStorage.getItem("userId"),
       videoUrl,
     });
