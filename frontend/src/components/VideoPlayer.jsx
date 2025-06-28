@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Play, Pause, RotateCcw, Clock, CheckCircle } from "lucide-react";
 import axios from "axios";
-
+import { throttle } from "lodash";
 import {
   setIsPlaying,
   resetProgress,
@@ -10,19 +10,16 @@ import {
   videoProgressSelector,
 } from "../Redux/VideoListRedux.jsx";
 import { secondsToIntervals, formatTime } from "../utils/utils";
-import {
-  saveVideoProgress,
-  updateLastPlayedVideo,
-} from "../Apis/UpdateVideoProgressApi.jsx";
+import { io } from "socket.io-client";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const socket = io(API_BASE_URL);
 const VideoPlayer = () => {
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const dispatch = useDispatch();
   const videoRef = useRef(null);
-  const previousVideoRef = useRef(null);
-  const lastTimeRef = useRef(0);
 
-  const { selectedVideo, videoProgressMap, isPlaying } = useSelector(
+
+  const { selectedVideo, videoProgressMap, isPlaying, userId } = useSelector(
     videoProgressSelector
   );
 
@@ -34,7 +31,6 @@ const VideoPlayer = () => {
     return new Set(videoProgressMap[selectedVideo?._id]?.watched || []);
   }, [videoProgressMap, selectedVideo?._id]);
 
-
   const progressPercent = useMemo(() => {
     const adjustedSize =
       watchedSeconds.size >= 1 ? watchedSeconds.size - 1 : watchedSeconds.size;
@@ -43,8 +39,39 @@ const VideoPlayer = () => {
 
   const intervals = secondsToIntervals(watchedSeconds);
 
+  const throttledEmit = useRef(
+    throttle((data) => {
+      socket.emit("video-progress", data);
+    }, 5000)
+  ).current;
+
   useEffect(() => {
     const video = videoRef.current;
+    if (!video || !selectedVideo?._id) return;
+
+    let animationId;
+
+    const trackProgress = () => {
+      if (!video.paused && !video.ended) {
+        const currentSecond = Math.floor(video.currentTime);
+        const currentTime = video.currentTime;
+        const duration = video.duration;
+
+        dispatch(
+          updateVideoProgress({
+            videoId: selectedVideo._id,
+            currentSecond,
+            currentTime,
+            duration,
+          })
+        );
+      }
+
+      animationId = requestAnimationFrame(trackProgress);
+    };
+
+    animationId = requestAnimationFrame(trackProgress);
+
     if (!video || !selectedVideo?._id) return;
 
     const handleLoadedMetadata = () => {
@@ -78,109 +105,25 @@ const VideoPlayer = () => {
     video.addEventListener("pause", handlePause);
 
     return () => {
+      cancelAnimationFrame(animationId);
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
     };
-  }, [selectedVideo, videoProgressMap, dispatch]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !selectedVideo?._id) return;
-
-    let animationId;
-
-    const trackProgress = () => {
-      if (!video.paused && !video.ended) {
-        const currentSecond = Math.floor(video.currentTime);
-        const currentTime = video.currentTime;
-        const duration = video.duration;
-
-        dispatch(
-          updateVideoProgress({
-            videoId: selectedVideo._id,
-            currentSecond,
-            currentTime,
-            duration,
-          })
-        );
-      }
-
-      animationId = requestAnimationFrame(trackProgress);
-    };
-
-    animationId = requestAnimationFrame(trackProgress);
-
-    return () => {
-      cancelAnimationFrame(animationId);
-    };
   }, [selectedVideo, dispatch]);
 
-  const saveProgressToServer = async (runImmediate) => {
+  const saveProgressToServer = () => {
     const videoProgress = videoProgressMap[selectedVideo?._id];
-
-    if (!videoProgress) return;
 
     const video = videoRef.current;
 
-    if (!runImmediate) {
-      if (!video || !selectedVideo?._id || video.paused || video.ended) return;
-
-      const currentSecond = Math.floor(video.currentTime);
-
-      if (videoProgress?.watched.includes(currentSecond)) return;
-    }
-
-    const timeDiff = Math.abs(Date.now() - lastTimeRef.current);
-
-    if (!runImmediate) {
-      if (timeDiff < 5000) return;
-    }
-
-    try {
-      lastTimeRef.current = Date.now();
-
-      await saveVideoProgress({
-        videoId: selectedVideo._id,
-        videoUrl: selectedVideo.videoUrl,
-        currentTime: video.currentTime,
-        duration: video.duration,
-        watchedSeconds: videoProgress?.watched || [],
-      });
-    } catch (error) {
-      console.error("Progress save failed:", error);
-    }
+    throttledEmit({
+      userId,
+      videoId: selectedVideo._id,
+      currentTime: video.currentTime,
+      watchedSeconds: videoProgress.watched || [],
+    });
   };
-
-  useEffect(() => {
-    const currentVideo = videoRef.current;
-    const prevVideo = previousVideoRef.current;
-
-    if (prevVideo && prevVideo?._id !== selectedVideo?._id) {
-      const prevProgress = videoProgressMap[prevVideo._id];
-
-      if (prevProgress && currentVideo) {
-        saveVideoProgress({
-          videoId: prevVideo._id,
-          videoUrl: prevVideo.videoUrl,
-          currentTime: currentVideo.currentTime,
-          duration: currentVideo.duration,
-          watchedSeconds: prevProgress?.watched || [],
-        }).catch((err) => {
-          console.error("Failed to save previous video progress", err);
-        });
-      }
-    }
-    previousVideoRef.current = selectedVideo;
-
-    if (selectedVideo?._id) {
-      updateLastPlayedVideo(selectedVideo?.videoUrl).catch((err) => {
-        console.error("Failed to update last played video", err);
-      });
-    }
-
-    lastTimeRef.current = 0;
-  }, [selectedVideo?._id]);
 
   useEffect(() => {
     saveProgressToServer();
@@ -194,16 +137,6 @@ const VideoPlayer = () => {
       video.play();
     } else {
       video.pause();
-    }
-  };
-
-  const handleResetProgress = () => {
-    if (selectedVideo?._id) {
-      dispatch(resetProgress(selectedVideo._id));
-      const video = videoRef.current;
-      if (video) {
-        video.currentTime = 0;
-      }
     }
   };
 

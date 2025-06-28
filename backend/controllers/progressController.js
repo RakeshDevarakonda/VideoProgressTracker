@@ -5,7 +5,6 @@ import { User } from "./../model/user-details.js";
 
 export const getAllVideosController = async (req, res) => {
   try {
-    console.log("Received getcontroller request");
 
     let { userId } = req.query;
 
@@ -24,7 +23,6 @@ export const getAllVideosController = async (req, res) => {
       await lastplayedUser.save();
 
       const allVideos = await VideoList.find();
-      console.log(allVideos);
 
       const progressToCreate = allVideos.map((video) => ({
         userId,
@@ -73,7 +71,6 @@ export const updateProgress = async (req, res) => {
         .json({ message: "Video progress not found for user" });
     }
 
-    console.log(User);
     const updateFields = {
       currentTime,
     };

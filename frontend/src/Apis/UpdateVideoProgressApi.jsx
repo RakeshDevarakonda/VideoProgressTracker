@@ -3,7 +3,6 @@ import axios from "axios";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const saveVideoProgress = async (data) => {
-  console.log("updated called")
 
   try {
     const response = await axios.put(`${API_BASE_URL}/api/updateProgress`, {
@@ -18,7 +17,6 @@ export const saveVideoProgress = async (data) => {
 };
 
 export const updateLastPlayedVideo = async (videoUrl) => {
-  console.log("lastplayed called")
   try {
     const response = await axios.put(`${API_BASE_URL}/api/updateLastPlayed`, {
       userId: localStorage.getItem("userId"),

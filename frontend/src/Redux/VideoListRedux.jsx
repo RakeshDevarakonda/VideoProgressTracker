@@ -5,6 +5,7 @@ const initialState = {
   isPlaying: false,
   videoList: null,
   selectedVideo: null,
+  userId: null,
 };
 
 const videoProgresSlice = createSlice({
@@ -13,6 +14,10 @@ const videoProgresSlice = createSlice({
   reducers: {
     setIsPlaying: (state, action) => {
       state.isPlaying = action.payload;
+    },
+
+    setUserId: (state, action) => {
+      state.userId = action.payload;
     },
     setVideoList: (state, action) => {
       state.videoList = action.payload;
@@ -79,6 +84,7 @@ export const {
   setSelectedVideo,
   resetProgress,
   updateVideoProgress,
+  setUserId,
 } = videoProgresSlice.actions;
 
 export const videoProgressSelector = (state) => state.videoProgressReducer;

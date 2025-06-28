@@ -7,6 +7,7 @@ import {
   setSelectedVideo,
   videoProgressSelector,
   setInitialVideoProgress,
+  setUserId,
 } from "../Redux/VideoListRedux.jsx";
 import { fetchVideoList } from "../Apis/VideoListAPi.jsx";
 
@@ -37,6 +38,7 @@ const VideoProgressTracker = () => {
           dispatch(setVideoList(newData));
           dispatch(setSelectedVideo(newData[dataIndex]));
           dispatch(setInitialVideoProgress(newData));
+          dispatch(setUserId(userId))
         }
       } catch (error) {
         console.error("Error fetching video list:", error.message);
