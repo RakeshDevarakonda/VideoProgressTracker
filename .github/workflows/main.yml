@@ -1,4 +1,4 @@
-name: Backend CI
+name: Backend CI with Docker
 
 on:
   push:
@@ -16,26 +16,24 @@ jobs:
       run:
         working-directory: backend
 
-    # env:
-    #   MONGODB_URI: ${{ secrets.MONGODB_URI }}
-    #   secretkey: ${{ secrets.secretkey }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          node-version: '18'
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run tests
-        run: npm test
-
-      - name: Deploy to Render
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Build and push Docker image
         run: |
-          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-videoproess-githubaction-app .
+          docker push ${{ secrets.DOCKER_USERNAME }}/my-videoproess-githubaction-app
+
+      - name: Deploy to Render (optional)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
