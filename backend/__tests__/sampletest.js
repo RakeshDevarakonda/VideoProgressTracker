@@ -6,7 +6,7 @@
 
 describe('add function', () => {
   test('adds two positive numbers', () => {
-    expect(add(2, 3)).toBe(5);
+    expect(add(2, 3)).toBe(4);
   });
 
   test('adds a positive and a negative number', () => {
