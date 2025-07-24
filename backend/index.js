@@ -32,9 +32,9 @@ app.get("/test1", (req, res) => {
 });
 
 
-// app.get("/test2", (req, res) => {
-//   res.send("test2");
-// });
+app.get("/test2", (req, res) => {
+  res.send("test2");
+});
 
 // app.get("/test3", (req, res) => {
 //   res.send("test3");
