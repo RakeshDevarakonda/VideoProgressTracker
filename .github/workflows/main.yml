@@ -3,10 +3,10 @@ name: Backend CI with Docker
 on:
   push:
     paths:
-      - 'backend/**'
+      - "backend/**"
   pull_request:
     paths:
-      - 'backend/**'
+      - "backend/**"
 
 jobs:
   build:
@@ -17,23 +17,34 @@ jobs:
         working-directory: backend
 
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker Buildx
+      - name: 🐋 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: 🔐 Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/my-videoproess-githubaction-app .
-          docker push ${{ secrets.DOCKER_USERNAME }}/my-videoproess-githubaction-app
+      - name: 📦 Install dependencies
+        run: npm install
 
-      - name: Deploy to Render (optional)
+      # - name: ✅ Run unit tests
+      #   run: npm test
+
+      - name: 🏗️ Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/docker-video-progress-cicd:latest
+            ${{ secrets.DOCKER_USERNAME }}/docker-video-progress-cicd:${{ github.sha }}
+
+      - name: 🚀 Deploy to Render (optional)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

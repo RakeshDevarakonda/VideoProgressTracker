@@ -1,15 +1,13 @@
-
 import express from "express";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
-import {VideoProgress} from "./model/user-video-progress.js";
-import { mongoosedatabse } from './utils/db.js';
-import progressRouter from './routes/progress-router.js';
+import { VideoProgress } from "./model/user-video-progress.js";
+import { mongoosedatabse } from "./utils/db.js";
+import progressRouter from "./routes/progress-router.js";
 
 dotenv.config();
-
 
 const app = express();
 
@@ -26,9 +24,20 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.get("/", (req, res) => {
-  res.redirect("https://video-progress-tracker-coral.vercel.app/");
+  res.send("https://video-progress-tracker-coral.vercel.app/");
 });
 
+app.get("/test1", (req, res) => {
+  res.send("test1");
+});
+
+// app.get("/test2", (req, res) => {
+//   res.send("test2");
+// });
+
+// app.get("/test3", (req, res) => {
+//   res.send("test3");
+// });
 
 app.use("/api", progressRouter);
 
